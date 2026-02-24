@@ -73,3 +73,33 @@ def update_done(id: int):
     with open('tasks.json', 'w') as f:
         json.dump(tasks, f, indent=4)
     f.close()
+
+def get_not_started():
+    res = list()
+    with open('tasks.json', 'r') as f:
+        tasks = json.load(f)
+    f.close()
+    for task in tasks:
+        if task['status'] == 'not started':
+            res.append(task)
+    return sorted(res, key=lambda x: x['priority'])
+
+def get_in_process():
+    res = list()
+    with open('tasks.json', 'r') as f:
+        tasks = json.load(f)
+    f.close()
+    for task in tasks:
+        if task['status'] == 'in process':
+            res.append(task)
+    return sorted(res, key=lambda x: x['priority'])
+
+def get_done():
+    res = list()
+    with open('tasks.json', 'r') as f:
+        tasks = json.load(f)
+    f.close()
+    for task in tasks:
+        if task['status'] == 'done':
+            res.append(task)
+    return sorted(res, key=lambda x: x['priority'])

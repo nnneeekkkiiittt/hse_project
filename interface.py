@@ -1,23 +1,24 @@
 import tkinter as tk
 from tkinter import messagebox
 import json
-from model import *
+import model
 
 
 class TaskApp:
     def __init__(self, master, filename='tasks.json'):
         self.master = master
-        self.master.title("Task Manager")
+        self.master.title("Таск-трекер")
         self.filename = filename
 
-        # Top frame with Create Task button
+        #фрейм создания задачи
         top_frame = tk.Frame(master)
         top_frame.pack(pady=15)
 
+        #кнопка создания задачи
         self.add_button = tk.Button(
-            top_frame, text="Create Task", command=self.show_create_task_dialog
+            top_frame, text="Создать задачу", command=self.show_create_task_dialog
         )
-        self.add_button.pack()
+        self.add_button.pack(fill="x")
 
         # Scrollable center frame
         canvas = tk.Canvas(master)
@@ -28,7 +29,7 @@ class TaskApp:
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
         )
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="center")
         canvas.configure(yscrollcommand=scrollbar.set)
 
         canvas.pack(side="left", fill="both", expand=True, padx=(30, 0), pady=20)
@@ -50,7 +51,8 @@ class TaskApp:
         )
         self.section_done.pack(fill="x", pady=(0, 10))
 
-        self.update_task_list()
+        # Инициализация списков задач с использованием функций из model.py
+        self._refresh_sections_from_model()
 
     def _create_task_row(self, parent, task):
         """Creates a row with task info and action buttons."""
@@ -60,62 +62,87 @@ class TaskApp:
         task_id = task["id"]
         status = task.get("status", "not started")
 
-        # Task info (click to view description)
-        info_text = f"#{task_id} {task['name']} | Priority: {task['priority']}"
-        lbl = tk.Label(row, text=info_text, anchor="w", cursor="hand2")
+        # Task info (plain label)
+        info_text = f"•{task['name']} | Priority: {task['priority']}"
+        lbl = tk.Label(row, text=info_text, anchor="w")
         lbl.pack(side="left", fill="x", expand=True)
-        desc = task.get("description", "(no description)")
-        lbl.bind(
-            "<Button-1>",
-            lambda e, name=task["name"], d=desc: self._show_description(name, d),
-        )
 
         # In Process button (disabled when already in process or done)
         in_proc_btn = tk.Button(
             row,
-            text="In Process",
-            width=10,
-            command=lambda: self._mark_in_process(task_id),
+            text="⌛",
+            width=2,
+            command=lambda tid=task_id: self._on_mark_in_process(tid),
         )
-        in_proc_btn.pack(side="right", padx=2)
-        if status in ("in process", "done"):
-            in_proc_btn.config(state="disabled")
 
         # Done button (disabled when already done)
         done_btn = tk.Button(
             row,
-            text="Done",
-            width=8,
-            command=lambda: self._mark_done(task_id),
+            text="✅",
+            width=2,
+            command=lambda tid=task_id: self._on_mark_done(tid),
         )
-        done_btn.pack(side="right", padx=2)
-        if status == "done":
-            done_btn.config(state="disabled")
+        
 
         # Delete button
         del_btn = tk.Button(
             row,
             text="🗑️",
-            width=6,
-            command=lambda: self._delete_task(task_id),
+            width=2,
+            command=lambda tid=task_id: self._on_delete(tid),
         )
+
+        # Description button
+        desc_text = task.get("description", "(no description)")
+        desc_btn = tk.Button(
+            row,
+            text="🗒️",
+            width=2,
+            command=lambda name=task["name"], d=desc_text: self._show_description(name, d),
+        )
+        desc_btn.pack(side="right", padx=2)
         del_btn.pack(side="right", padx=2)
+        done_btn.pack(side="right", padx=2)
+        if status == "done":
+            done_btn.config(state="disabled")
+        in_proc_btn.pack(side="right", padx=2)
+        if status in ("in process", "done"):
+            in_proc_btn.config(state="disabled")
+
+
 
     def _show_description(self, task_name, description):
         """Shows task description in a message dialog."""
-        messagebox.showinfo(f"Task: {task_name}", description)
-
-    def _mark_in_process(self, task_id):
-        update_in_process(task_id)
-        self.update_task_list()
-
-    def _mark_done(self, task_id):
-        update_done(task_id)
-        self.update_task_list()
+        messagebox.showinfo(f"Задача: {task_name}", description)
 
     def _clear_section(self, section):
         for widget in section.winfo_children():
             widget.destroy()
+
+    def _refresh_sections_from_model(self):
+        """Reload all three status sections from model.py helpers."""
+        self._clear_section(self.section_not_started)
+        self._clear_section(self.section_in_process)
+        self._clear_section(self.section_done)
+
+        for task in model.get_not_started():
+            self._create_task_row(self.section_not_started, task)
+        for task in model.get_in_process():
+            self._create_task_row(self.section_in_process, task)
+        for task in model.get_done():
+            self._create_task_row(self.section_done, task)
+
+    def _on_mark_in_process(self, task_id: int):
+        model.update_in_process(task_id)
+        self._refresh_sections_from_model()
+
+    def _on_mark_done(self, task_id: int):
+        model.update_done(task_id)
+        self._refresh_sections_from_model()
+
+    def _on_delete(self, task_id: int):
+        model.delete_task(task_id)
+        self._refresh_sections_from_model()
 
     def show_create_task_dialog(self):
         """Opens a dialog to create a new task."""
@@ -125,45 +152,56 @@ class TaskApp:
         dialog.transient(self.master)
         dialog.grab_set()
 
-        tk.Label(dialog, text="Name:").grid(row=0, column=0, sticky="w", padx=10, pady=5)
+        tk.Label(dialog, text="Название:").grid(row=0, column=0, sticky="w", padx=10, pady=5)
         name_entry = tk.Entry(dialog, width=35)
         name_entry.grid(row=0, column=1, padx=10, pady=5)
 
-        tk.Label(dialog, text="Description:").grid(
+        tk.Label(dialog, text="Описание:").grid(
             row=1, column=0, sticky="w", padx=10, pady=5
         )
         desc_entry = tk.Entry(dialog, width=35)
         desc_entry.grid(row=1, column=1, padx=10, pady=5)
 
-        tk.Label(dialog, text="Priority (1-10):").grid(
+        tk.Label(dialog, text="Срочность (1-3):").grid(
             row=2, column=0, sticky="w", padx=10, pady=5
         )
         priority_entry = tk.Entry(dialog, width=10)
-        priority_entry.insert(0, "5")
         priority_entry.grid(row=2, column=1, sticky="w", padx=10, pady=5)
 
-        tk.Label(dialog, text="Days until deadline:").grid(
+        tk.Label(dialog, text="Время до дедлайна дней/часов/минут:").grid(
             row=3, column=0, sticky="w", padx=10, pady=5
         )
-        days_entry = tk.Entry(dialog, width=10)
-        days_entry.insert(0, "0")
-        days_entry.grid(row=3, column=1, sticky="w", padx=10, pady=5)
+        time_frame = tk.Frame(dialog)
+        time_frame.grid(row=3, column=1, columnspan=2, sticky="w", pady=5)
+        days_entry = tk.Entry(time_frame, width=3)
+        days_entry.grid(row=0, column=0, padx=1)
+        hours_entry = tk.Entry(time_frame, width=3)
+        hours_entry.grid(row=0, column=1, padx=4)
+        minutes_entry = tk.Entry(time_frame, width=3)
+        minutes_entry.grid(row=0, column=2, padx=4)
 
         def on_create():
             name = name_entry.get().strip()
             description = desc_entry.get().strip()
             if not name:
-                messagebox.showwarning("Warning", "Please enter a task name.")
+                messagebox.showwarning("Warning", "Введите имя задачи.")
                 return
             try:
                 priority = int(priority_entry.get())
                 days = int(days_entry.get())
             except ValueError:
-                messagebox.showerror("Error", "Priority and days must be numbers.")
+                messagebox.showerror("Error", "Неверный тип данных.")
                 return
-            task = Task(name=name, description=description, priority=priority, days=days)
+
+            task = model.Task(
+                name=name,
+                description=description,
+                priority=priority,
+                days=days,
+            )
             task.add_task()
-            self.update_task_list()
+            self._refresh_sections_from_model()
+
             dialog.destroy()
 
         btn_frame = tk.Frame(dialog)
@@ -171,35 +209,3 @@ class TaskApp:
 
         tk.Button(btn_frame, text="Create", command=on_create).pack(side=tk.LEFT, padx=5)
         tk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT)
-
-    def _delete_task(self, task_id):
-        """Deletes a task by id using model.delete_task."""
-        delete_task(task_id)
-        self.update_task_list()
-
-    def update_task_list(self):
-        """Refreshes the task list from tasks.json, grouped by status."""
-        self._clear_section(self.section_not_started)
-        self._clear_section(self.section_in_process)
-        self._clear_section(self.section_done)
-
-        try:
-            with open(self.filename, "r") as f:
-                tasks = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            tasks = []
-
-        for task in tasks:
-            status = task.get("status", "not started")
-            # Normalize status for grouping (model uses "in process" with space)
-            if status in ("in process", "inprogress"):
-                status = "in process"
-            elif status in ("not started", "notstarted"):
-                status = "not started"
-
-            if status == "not started":
-                self._create_task_row(self.section_not_started, task)
-            elif status == "in process":
-                self._create_task_row(self.section_in_process, task)
-            else:  # done
-                self._create_task_row(self.section_done, task)
