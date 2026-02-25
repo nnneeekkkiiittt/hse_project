@@ -1,5 +1,15 @@
 import json
 from datetime import datetime, timedelta
+import os
+import sys
+
+#необходимо для правильной сборки в .exe файл
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
+tasks_path = resource_path("tasks.json")
 
 #класс для описания задачи
 class Task:
@@ -17,7 +27,7 @@ class Task:
     #добавление задачи
     def add_task(self):
         try:
-            with open('tasks.json', 'r') as f:
+            with open(tasks_path, 'r') as f:
                 tasks = json.load(f)
             f.close()
         except Exception:
@@ -32,7 +42,7 @@ class Task:
             'flag': self.flag
         }
         tasks.append(task)
-        with open('tasks.json', 'w') as f:
+        with open(tasks_path, 'w') as f:
             json.dump(tasks, f, indent=4)
         f.close()
 
@@ -41,47 +51,47 @@ class Task:
 
 #удаление задачи
 def delete_task(id: int):
-    with open('tasks.json', 'r') as f:
+    with open(tasks_path, 'r') as f:
         tasks = json.load(f)
     f.close()
     for i in range(len(tasks)):
         if tasks[i]['id'] == id:
             del tasks[i]
             break
-    with open('tasks.json', 'w') as f:
+    with open(tasks_path, 'w') as f:
         json.dump(tasks, f, indent=4)
     f.close()
 
 #отметка задачи как "в процессе"
 def update_in_process(id: int):
-    with open('tasks.json', 'r') as f:
+    with open(tasks_path, 'r') as f:
         tasks = json.load(f)
     f.close()
     for i in range(len(tasks)):
         if tasks[i]['id'] == id:
             tasks[i]['status'] = 'in process'
             break
-    with open('tasks.json', 'w') as f:
+    with open(tasks_path, 'w') as f:
         json.dump(tasks, f, indent=4)
     f.close()
 
 #отметка задачи как "сделано"
 def update_done(id: int):
-    with open('tasks.json', 'r') as f:
+    with open(tasks_path, 'r') as f:
         tasks = json.load(f)
     f.close()
     for i in range(len(tasks)):
         if tasks[i]['id'] == id:
             tasks[i]['status'] = 'done'
             break
-    with open('tasks.json', 'w') as f:
+    with open(tasks_path, 'w') as f:
         json.dump(tasks, f, indent=4)
     f.close()
 
 #получение еще не начатых задач
 def get_not_started():
     res = list()
-    with open('tasks.json', 'r') as f:
+    with open(tasks_path, 'r') as f:
         tasks = json.load(f)
     f.close()
     for task in tasks:
@@ -92,7 +102,7 @@ def get_not_started():
 #получение задач со статусом "в процессе"
 def get_in_process():
     res = list()
-    with open('tasks.json', 'r') as f:
+    with open(tasks_path, 'r') as f:
         tasks = json.load(f)
     f.close()
     for task in tasks:
@@ -103,7 +113,7 @@ def get_in_process():
 #получение сделанных задач
 def get_done():
     res = list()
-    with open('tasks.json', 'r') as f:
+    with open(tasks_path, 'r') as f:
         tasks = json.load(f)
     f.close()
     for task in tasks:

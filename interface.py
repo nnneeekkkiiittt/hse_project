@@ -6,10 +6,9 @@ import model
 
 #класс приложения tkinter
 class TaskApp:
-    def __init__(self, master, filename='tasks.json'):
+    def __init__(self, master):
         self.master = master
         self.master.title("Таск-трекер")
-        self.filename = filename
 
         #фрейм создания задачи
         top_frame = tk.Frame(master)
