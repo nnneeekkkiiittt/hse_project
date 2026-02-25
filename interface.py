@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
-import json
+from datetime import datetime
 import model
 
 
@@ -62,16 +62,33 @@ class TaskApp:
         task_id = task["id"]
         status = task.get("status", "not started")
 
+        # Parse deadline and check if overdue
+        deadline = task.get('deadline')
+        is_exceeded = False
+        if deadline != 'Нет':
+            deadline_dt = datetime.strptime(deadline.split(".")[0], "%Y-%m-%d %H:%M:%S")
+            if (deadline_dt - datetime.now()).total_seconds() <= 3600:
+                is_exceeded = True
+            deadline_dt = deadline_dt.strftime("%d.%m.%Y %H:%M")
+        else:
+            deadline_dt = deadline
+        if status == 'done':
+            color = 'black'
+        elif is_exceeded:
+            color = 'red'
+        else:
+            color = 'black'
+
         # Task info (plain label)
         info_text = f"•{task['name']} | Priority: {task['priority']}"
-        lbl = tk.Label(row, text=info_text, anchor="w")
+        lbl = tk.Label(row, text=info_text, anchor="w", fg=color)
         lbl.pack(side="left", fill="x", expand=True)
 
         # In Process button (disabled when already in process or done)
         in_proc_btn = tk.Button(
             row,
             text="⌛",
-            width=2,
+            width=1,
             command=lambda tid=task_id: self._on_mark_in_process(tid),
         )
 
@@ -79,7 +96,7 @@ class TaskApp:
         done_btn = tk.Button(
             row,
             text="✅",
-            width=2,
+            width=1,
             command=lambda tid=task_id: self._on_mark_done(tid),
         )
         
@@ -88,23 +105,28 @@ class TaskApp:
         del_btn = tk.Button(
             row,
             text="🗑️",
-            width=2,
+            width=1,
             command=lambda tid=task_id: self._on_delete(tid),
         )
 
         # Description button
-        desc_text = task.get("description", "(no description)")
+        desc_text = task.get("description")
         desc_btn = tk.Button(
             row,
             text="🗒️",
-            width=2,
+            width=1,
             command=lambda name=task["name"], d=desc_text: self._show_description(name, d),
         )
+        # Deadline label (right side, before buttons)
+        deadline_lbl = tk.Label(row, text=f'Дедлайн: {deadline_dt}', fg=color, font=("Arial", 9))
+        deadline_lbl.pack(side="right", padx=(0, 15))
+
         desc_btn.pack(side="right", padx=2)
         del_btn.pack(side="right", padx=2)
         done_btn.pack(side="right", padx=2)
         if status == "done":
             done_btn.config(state="disabled")
+            deadline_lbl.pack_forget()
         in_proc_btn.pack(side="right", padx=2)
         if status in ("in process", "done"):
             in_proc_btn.config(state="disabled")
@@ -125,12 +147,34 @@ class TaskApp:
         self._clear_section(self.section_in_process)
         self._clear_section(self.section_done)
 
-        for task in model.get_not_started():
-            self._create_task_row(self.section_not_started, task)
-        for task in model.get_in_process():
-            self._create_task_row(self.section_in_process, task)
-        for task in model.get_done():
-            self._create_task_row(self.section_done, task)
+        not_started = model.get_not_started()
+        in_process = model.get_in_process()
+        done = model.get_done()
+
+        if len(not_started) == 0:
+            self.section_not_started.pack_forget()
+        else:
+            self.section_not_started.pack(fill="x", pady=(0, 10))
+            for task in not_started:
+                self._create_task_row(self.section_not_started, task)
+        if len(in_process) == 0:
+            self.section_in_process.pack_forget()
+        else:
+            self.section_in_process.pack(fill='x', pady=(0, 10))
+            for task in in_process:
+                self._create_task_row(self.section_in_process, task)
+        if len(done) == 0:
+            self.section_done.pack_forget()
+        else:
+            self.section_done.pack(fill='x', pady=(0, 10))
+            for task in done:
+                self._create_task_row(self.section_done, task)
+
+        
+        
+       
+
+        
 
     def _on_mark_in_process(self, task_id: int):
         model.update_in_process(task_id)
@@ -188,7 +232,18 @@ class TaskApp:
                 return
             try:
                 priority = int(priority_entry.get())
-                days = int(days_entry.get())
+                if len(days_entry.get()) > 0:
+                    days = int(days_entry.get())
+                else:
+                    days = 0
+                if len(hours_entry.get()) > 0:
+                    hours = int(hours_entry.get())
+                else:
+                    hours = 0
+                if len(minutes_entry.get()) > 0:
+                    minutes = int(minutes_entry.get())
+                else:
+                    minutes = 0
             except ValueError:
                 messagebox.showerror("Error", "Неверный тип данных.")
                 return
@@ -198,10 +253,11 @@ class TaskApp:
                 description=description,
                 priority=priority,
                 days=days,
+                hours=hours,
+                minutes=minutes,
             )
             task.add_task()
             self._refresh_sections_from_model()
-
             dialog.destroy()
 
         btn_frame = tk.Frame(dialog)
